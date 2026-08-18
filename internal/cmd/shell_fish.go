@@ -41,32 +41,35 @@ func (sh fish) Hook() (string, error) {
 }
 
 func (sh fish) Export(e ShellExport) (string, error) {
-	var out string
+	var out strings.Builder
 	for key, value := range e {
 		if value == nil {
-			out += sh.unset(key)
+			out.WriteString(sh.unset(key))
 		} else {
-			out += sh.export(key, *value)
+			out.WriteString(sh.export(key, *value))
 		}
 	}
-	return out, nil
+	return out.String(), nil
 }
 
 func (sh fish) Dump(env Env) (string, error) {
-	var out string
+	var out strings.Builder
 	for key, value := range env {
-		out += sh.export(key, value)
+		out.WriteString(sh.export(key, value))
 	}
-	return out, nil
+	return out.String(), nil
 }
 
 func (sh fish) export(key, value string) string {
 	if key == "PATH" {
-		command := "set -x -g PATH"
+		var command strings.Builder
+		command.WriteString("set -x -g PATH")
 		for _, path := range strings.Split(value, ":") {
-			command += " " + sh.escape(path)
+			command.WriteString(" ")
+			command.WriteString(sh.escape(path))
 		}
-		return command + ";"
+		command.WriteString(";")
+		return command.String()
 	}
 	return "set -x -g " + sh.escape(key) + " " + sh.escape(value) + ";"
 }
@@ -77,24 +80,29 @@ func (sh fish) unset(key string) string {
 
 func (sh fish) escape(str string) string {
 	in := []byte(str)
-	out := "'"
+	var out strings.Builder
+	out.Grow(len(in) + 2)
+	out.WriteByte(SINGLE_QUOTE)
 	i := 0
 	l := len(in)
 
 	hex := func(char byte) {
-		out += fmt.Sprintf("'\\X%02x'", char)
+		fmt.Fprintf(&out, "'\\X%02x'", char)
 	}
 
 	backslash := func(char byte) {
-		out += string([]byte{BACKSLASH, char})
+		out.WriteByte(BACKSLASH)
+		out.WriteByte(char)
 	}
 
 	escaped := func(str string) {
-		out += "'" + str + "'"
+		out.WriteByte(SINGLE_QUOTE)
+		out.WriteString(str)
+		out.WriteByte(SINGLE_QUOTE)
 	}
 
 	literal := func(char byte) {
-		out += string([]byte{char})
+		out.WriteByte(char)
 	}
 
 	for i < l {
@@ -122,7 +130,7 @@ func (sh fish) escape(str string) string {
 		i++
 	}
 
-	out += "'"
+	out.WriteByte(SINGLE_QUOTE)
 
-	return out
+	return out.String()
 }
